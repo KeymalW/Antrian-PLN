@@ -30,4 +30,18 @@ class AntrianController extends Controller
 
         return response()->json($antrian);
     }
+
+    public function index()
+    {
+        $today = now()->toDateString();
+
+        $data = Antrian::whereDate('tanggal', $today)
+        ->orderBy('id', 'asc')
+        ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $data
+        ]);
+    }
 }

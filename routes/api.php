@@ -19,3 +19,4 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 Route::post('/antrian', [AntrianController::class, 'store']);
+Route::get('/antrian', [AntrianController::class, 'index']);
