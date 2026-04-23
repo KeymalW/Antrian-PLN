@@ -8,7 +8,7 @@ use Carbon\Carbon;
 
 class AntrianController extends Controller
 {
-    
+    //buat antrian baru
     public function store()
     {
         $today = Carbon::today();
@@ -31,6 +31,7 @@ class AntrianController extends Controller
         return response()->json($antrian);
     }
 
+    //list antrian hari ini
     public function index()
     {
         $today = now()->toDateString();
@@ -42,6 +43,23 @@ class AntrianController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $data
+        ]);
+    }
+
+    //panggil antrian
+    public function panggil($id)
+    {
+        // set semua yang sedang dipanggil jadi selesai
+        Antrian::where('status', 'dipanggil')->update(['status' => 'selesai']);
+        
+        //ambil antrian berdasarkan id dan set statusnya jadi dipanggil
+        $antrian = Antrian::findOrFail($id);
+        $antrian->update(['status' => 'dipanggil']);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Antrian dipanggil',
+            'data' => $antrian
         ]);
     }
 }
