@@ -62,4 +62,18 @@ class AntrianController extends Controller
             'data' => $antrian
         ]);
     }
+
+    //ambil antrian yang sedang dipanggil atau aktif
+    public function aktif()
+    {
+        $antrian = Antrian::where('status', 'dipanggil')
+        ->latest()
+        ->first();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $antrian
+        ]);
+
+    }
 }
