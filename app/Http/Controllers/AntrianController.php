@@ -63,7 +63,7 @@ class AntrianController extends Controller
         ]);
     }
 
-    //ambil antrian yang sedang dipanggil atau aktif
+    //ambil antrian yang sedang dipanggil
     public function aktif()
     {
         $antrian = Antrian::where('status', 'dipanggil')
