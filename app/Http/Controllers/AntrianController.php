@@ -89,5 +89,5 @@ class AntrianController extends Controller
             'data' => $antrian
         ]);
     }
-
 }
+
