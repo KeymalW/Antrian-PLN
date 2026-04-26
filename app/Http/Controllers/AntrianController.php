@@ -89,5 +89,21 @@ class AntrianController extends Controller
             'data' => $antrian
         ]);
     }
+
+    //lewati antrian
+    public function lewati($id)
+    {
+        $antrian = Antrian::findOrFail($id);
+        $antrian->update([
+            'status' => 'lewati'
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Antrian berhasil dilewati',
+            'data' => $antrian
+        ]);
+    }
 }
+
 
