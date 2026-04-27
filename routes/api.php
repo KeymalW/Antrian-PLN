@@ -23,5 +23,7 @@ Route::get('/antrian', [AntrianController::class, 'index']);
 Route::put('/antrian/{id}/panggil', [AntrianController::class, 'panggil']);
 Route::get('/antrian/aktif', [AntrianController::class, 'aktif']);
 Route::put('/antrian/{id}/lewati', [AntrianController::class, 'lewati']);
+Route::get('/antrian/statistik', [AntrianController::class, 'statistik']);
+
 
 

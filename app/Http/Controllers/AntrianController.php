@@ -104,6 +104,30 @@ class AntrianController extends Controller
             'data' => $antrian
         ]);
     }
+
+    //statistik antrian hari ini
+    public function statistik()
+    {
+        $today = now()->toDateString();
+
+        $total = Antrian::whereDate('tanggal', $today)->count();
+        $menunggu = Antrian::whereDate('tanggal', $today)->where('status', 'menunggu')->count();
+        $dipanggil = Antrian::whereDate('tanggal', $today)->where('status', 'dipanggil')->count();
+        $selesai = Antrian::whereDate('tanggal', $today)->where('status', 'selesai')->count();
+        $lewati = Antrian::whereDate('tanggal', $today)->where('status', 'lewati')->count();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'total' => $total,
+                'menunggu' => $menunggu,
+                'dipanggil' => $dipanggil,
+                'selesai' => $selesai,
+                'lewati' => $lewati,
+            ]
+        ]);
+    }
 }
+
 
 
