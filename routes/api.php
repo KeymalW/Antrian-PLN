@@ -26,4 +26,5 @@ Route::put('/antrian/{id}/lewati', [AntrianController::class, 'lewati']);
 Route::get('/antrian/statistik', [AntrianController::class, 'statistik']);
 Route::get('/dashboard/analitik', [DashboardController::class, 'analitik']);
 
-
+
+
