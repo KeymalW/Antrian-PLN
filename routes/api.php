@@ -3,7 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AntrianController;
-
+use App\Http\Controllers\DashboardController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -24,6 +24,6 @@ Route::put('/antrian/{id}/panggil', [AntrianController::class, 'panggil']);
 Route::get('/antrian/aktif', [AntrianController::class, 'aktif']);
 Route::put('/antrian/{id}/lewati', [AntrianController::class, 'lewati']);
 Route::get('/antrian/statistik', [AntrianController::class, 'statistik']);
-
+Route::get('/dashboard/analitik', [DashboardController::class, 'analitik']);
 
 
