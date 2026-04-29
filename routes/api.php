@@ -26,6 +26,7 @@ Route::post('/antrian', [AntrianController::class, 'store']);
 Route::get('/antrian', [AntrianController::class, 'index']);
 Route::get('/antrian/aktif', [AntrianController::class, 'aktif']);
 Route::get('/antrian/statistik', [AntrianController::class, 'statistik']);
+Route::get('/antrian/{id}/status', [AntrianController::class, 'status']);
 
 // Rute Terlindungi (Khusus Admin/Petugas yang udah login)
 Route::middleware('auth:sanctum')->group(function () {
@@ -34,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/antrian/{id}/lewati', [AntrianController::class, 'lewati']);
     Route::get('/dashboard/analitik', [DashboardController::class, 'analitik']);
 });
+
 
 
 

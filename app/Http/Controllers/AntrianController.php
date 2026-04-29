@@ -127,6 +127,81 @@ class AntrianController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Hitung Estimasi Waktu Tunggu (ETA) dalam menit
+     * Rumus: (Antrian di depan * Rata-rata waktu pelayanan) / Jumlah loket aktif
+     */
+    private function hitungETA($antrian)
+    {
+        $today = Carbon::today();
+
+        // 1. Hitung jumlah antrian di depan yang statusnya masih 'menunggu'
+        $antrianDiDepan = Antrian::whereDate('tanggal', $today)
+            ->where('status', 'menunggu')
+            ->where('id', '<', $antrian->id)
+            ->count();
+
+        // 2. Hitung rata-rata waktu pelayanan hari ini (dari panggil_at sampai selesai/updated_at)
+        $antrianSelesai = Antrian::whereDate('tanggal', $today)
+            ->where('status', 'selesai')
+            ->whereNotNull('panggil_at')
+            ->get();
+
+        $totalWaktu = 0;
+        $jumlahSelesai = $antrianSelesai->count();
+
+        if ($jumlahSelesai > 0) {
+            foreach ($antrianSelesai as $a) {
+                // Selisih waktu dalam menit antara dipanggil dan selesai
+                $waktu = Carbon::parse($a->panggil_at)->diffInMinutes($a->updated_at);
+                $totalWaktu += $waktu;
+            }
+            $rataRataWaktu = $totalWaktu / $jumlahSelesai;
+        } else {
+            // Default kalau belum ada yang selesai hari ini: 5 menit per orang
+            $rataRataWaktu = 5;
+        }
+
+        // 3. Hitung jumlah loket yang lagi aktif (sedang melayani)
+        $loketAktif = Antrian::whereDate('tanggal', $today)
+            ->where('status', 'dipanggil')
+            ->distinct('loket')
+            ->count('loket');
+
+        // Biar nggak error dibagi nol (misal petugas belum pada login/manggil)
+        if ($loketAktif == 0) {
+            $loketAktif = 1; 
+        }
+
+        // 4. Kalkulasi ETA akhir
+        $etaMenit = ($antrianDiDepan * $rataRataWaktu) / $loketAktif;
+
+        // Bulatkan ke atas
+        return ceil($etaMenit);
+    }
+
+    // Cek status tiket pelanggan (Publik - Buat nampilin ETA di HP)
+    public function status($id)
+    {
+        $antrian = Antrian::findOrFail($id);
+
+        $antrianDiDepan = Antrian::whereDate('tanggal', Carbon::today())
+            ->where('status', 'menunggu')
+            ->where('id', '<', $antrian->id)
+            ->count();
+
+        $eta = $this->hitungETA($antrian);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'antrian' => $antrian,
+                'sisa_antrian_di_depan' => $antrianDiDepan,
+                'estimasi_waktu_menit' => $eta
+            ]
+        ]);
+    }
 }
 
 
