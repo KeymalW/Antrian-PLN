@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi TV Antrian & Suara</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #f4f4f9;
+            padding: 50px;
+        }
+
+        .box {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            min-width: 300px;
+        }
+
+        h1 {
+            font-size: 4rem;
+            color: #333;
+            margin: 10px 0;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            color: #666;
+        }
+
+        .status {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            background: #0056b3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #004494;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="box">
+        <h2>Nomor Antrian Dipanggil:</h2>
+        <h1 id="nomor-antrian">--</h1>
+        <h2 id="loket">Loket --</h2>
+        <p class="status" id="status-koneksi">Klik "Mulai" agar browser mengizinkan suara keluar</p>
+        <br>
+        <button id="btn-mulai">Mulai TV Antrian</button>
+    </div>
+
+    <script>
+        let lastId = null;
+        let isRunning = false;
+
+        // Browser modern wajibin user nge-klik sesuatu dulu sebelum boleh muter suara otomatis
+        document.getElementById('btn-mulai').addEventListener('click', function () {
+            if (!isRunning) {
+                isRunning = true;
+                this.style.display = 'none';
+                document.getElementById('status-koneksi').innerText = '📡 Memantau antrian secara real-time...';
+
+                // Mancing izin suara browser dengan muter suara kosong
+                let silentMsg = new SpeechSynthesisUtterance("");
+                window.speechSynthesis.speak(silentMsg);
+
+                // Mulai ngecek API publik kita tiap 3 detik
+                setInterval(cekAntrianAktif, 3000);
+                cekAntrianAktif(); // Panggil sekali langsung biar nggak usah nunggu 3 detik
+            }
+        });
+
+        async function cekAntrianAktif() {
+            try {
+                // Tembak API Publik kita (nggak butuh token login, ini khusus display TV)
+                let response = await fetch('/api/antrian/aktif');
+                let result = await response.json();
+
+                if (result.status === 'success' && result.data) {
+                    let antrian = result.data;
+
+                    // Kalau ada antrian yang ID-nya beda dari sebelumnya (antrian baru dipanggil)
+                    if (antrian.id !== lastId) {
+                        lastId = antrian.id;
+
+                        // Update teks di layar TV
+                        document.getElementById('nomor-antrian').innerText = antrian.nomor_antrian;
+                        document.getElementById('loket').innerText = "Loket " + antrian.loket;
+
+                        // Eksekusi Panggilan Suara Otomatis
+                        bunyikanSuara(antrian.nomor_antrian, antrian.loket);
+                    }
+                }
+            } catch (error) {
+                console.error("Gagal mengambil data antrian", error);
+            }
+        }
+
+        function bunyikanSuara(nomor, loket) {
+            // Trik biar bacanya dieja per huruf/angka. Misal "A012" jadi "A 0 1 2"
+            let nomorDiEja = nomor.split('').join(' ');
+
+            let teks = `Nomor antrian... ${nomorDiEja}... silakan menuju ke... loket ${loket}`;
+
+            let suara = new SpeechSynthesisUtterance(teks);
+            suara.lang = "id-ID"; // Aksen bahasa Indonesia
+            suara.rate = 0.85; // Kecepatan ngomong agak santai biar jelas
+
+            // Trik buat nyari suara cewek
+            let voices = window.speechSynthesis.getVoices();
+
+            // Log ke console biar kita bisa ngintip nama-nama suaranya
+            console.log("Daftar Suara yang tersedia:", voices.filter(v => v.lang.includes('id')));
+
+            // Prioritas 1: Google Bahasa Indonesia (Suara mbak-mbak Chrome)
+            // Prioritas 2: Gadis atau Ayu (Suara mbak-mbak Windows)
+            let suaraCewek = voices.find(v => v.name === 'Google Bahasa Indonesia') ||
+                voices.find(v => v.lang.includes('id') && (v.name.includes('Gadis') || v.name.includes('Ayu') || v.name.toLowerCase().includes('female')));
+
+            // Kalau ketemu suara cewek, pake yang itu. Kalau nggak ada, pake default aja
+            if (suaraCewek) {
+                suara.voice = suaraCewek;
+            }
+
+            window.speechSynthesis.speak(suara);
+        }
+    </script>
+</body>
+
+</html>
