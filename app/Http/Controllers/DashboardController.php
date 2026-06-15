@@ -11,55 +11,54 @@ class DashboardController extends Controller
 {
     public function analitik(Request $request)
     {
-        // Secara default nampilin data 7 hari terakhir
         $startDate = $request->input('start_date', Carbon::now()->subDays(6)->toDateString());
         $endDate = $request->input('end_date', Carbon::now()->toDateString());
 
-        // Base query buat filter tanggal
         $query = Antrian::whereBetween('tanggal', [$startDate, $endDate]);
 
-        // 1. Ringkasan Status
         $ringkasan = [
             'total' => (clone $query)->count(),
-            'menunggu' => (clone $query)->where('status', 'menunggu')->count(),
-            'dipanggil' => (clone $query)->where('status', 'dipanggil')->count(),
-            'selesai' => (clone $query)->where('status', 'selesai')->count(),
-            'lewati' => (clone $query)->where('status', 'lewati')->count(),
+            'waiting' => (clone $query)->where('status', 'waiting')->count(),
+            'called' => (clone $query)->where('status', 'called')->count(),
+            'completed' => (clone $query)->where('status', 'completed')->count(),
+            'skipped' => (clone $query)->where('status', 'skipped')->count(),
         ];
 
-        // 2. Kinerja per Loket (Loket mana yang paling sibuk)
-        $kinerjaLoket = (clone $query)->select('loket', DB::raw('count(*) as total'))
-            ->whereNotNull('loket')
-            ->groupBy('loket')
-            ->get();
+        $kinerjaLoket = (clone $query)->select('counter_number', DB::raw('count(*) as total'))
+            ->whereNotNull('counter_number')
+            ->groupBy('counter_number')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'loket' => (string) $item->counter_number,
+                    'total' => $item->total,
+                ];
+            });
 
-        // 3. Tren Harian (Buat dibikin grafik garis/bar nanti)
         $trenHarian = (clone $query)->select('tanggal', DB::raw('count(*) as total'))
             ->groupBy('tanggal')
             ->orderBy('tanggal', 'asc')
             ->get();
 
         return response()->json([
-            'status' => 'success',
+            'success' => true,
             'periode' => [
                 'start_date' => $startDate,
-                'end_date' => $endDate
+                'end_date' => $endDate,
             ],
             'data' => [
                 'ringkasan' => $ringkasan,
                 'kinerja_loket' => $kinerjaLoket,
-                'tren_harian' => $trenHarian
+                'tren_harian' => $trenHarian,
             ]
         ]);
     }
 
     public function export(Request $request)
     {
-        // Ambil filter bulan & tahun (default: bulan ini)
         $bulan = $request->input('bulan', Carbon::now()->month);
         $tahun = $request->input('tahun', Carbon::now()->year);
 
-        // Ambil data dari database
         $antrians = Antrian::whereMonth('tanggal', $bulan)
                            ->whereYear('tanggal', $tahun)
                            ->orderBy('tanggal', 'asc')
@@ -67,36 +66,33 @@ class DashboardController extends Controller
 
         $fileName = "laporan_antrian_pln_{$bulan}_{$tahun}.csv";
 
-        // Bikin header khusus biar browser ngenalin ini sebagai file download
-        $headers = array(
+        $headers = [
             "Content-type"        => "text/csv",
             "Content-Disposition" => "attachment; filename=$fileName",
             "Pragma"              => "no-cache",
             "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
-        );
+            "Expires"             => "0",
+        ];
 
-        $columns = ['ID', 'Nomor Antrian', 'Status', 'Loket', 'Tanggal', 'Waktu Dipanggil', 'Waktu Selesai'];
+        $columns = ['ID', 'Nomor Antrian', 'Layanan', 'Status', 'Loket', 'Tanggal', 'Waktu Dipanggil', 'Waktu Selesai'];
 
-        // Tulis datanya baris per baris pakai PHP stream
-        $callback = function() use($antrians, $columns) {
+        $callback = function () use ($antrians, $columns) {
             $file = fopen('php://output', 'w');
-            
-            // Tambahkan UTF-8 BOM biar karakter aneh terbaca bener di Excel
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            
-            // Pake pemisah titik koma (;) khusus biar rapi di Excel region Indonesia
-            fputcsv($file, $columns, ';'); 
+
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($file, $columns, ';');
 
             foreach ($antrians as $antrian) {
                 fputcsv($file, [
                     $antrian->id,
                     $antrian->nomor_antrian,
+                    $antrian->service_type,
                     strtoupper($antrian->status),
-                    $antrian->loket ? "Loket {$antrian->loket}" : '-',
+                    $antrian->counter_number ? "Loket {$antrian->counter_number}" : '-',
                     $antrian->tanggal,
-                    $antrian->panggil_at ?? '-',
-                    $antrian->status === 'selesai' ? $antrian->updated_at : '-'
+                    $antrian->called_at ?? '-',
+                    $antrian->completed_at ?? '-',
                 ], ';');
             }
 
@@ -106,4 +102,3 @@ class DashboardController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 }
- 

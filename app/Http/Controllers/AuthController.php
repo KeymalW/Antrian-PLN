@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 
 class AuthController extends Controller
@@ -17,7 +18,7 @@ class AuthController extends Controller
 
         if (!Auth::attempt($request->only('username', 'password'))) {
             return response()->json([
-                'status' => 'error',
+                'success' => false,
                 'message' => 'Username atau password salah'
             ], 401);
         }
@@ -27,7 +28,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'status' => 'success',
+            'success' => true,
             'message' => 'Login berhasil',
             'data' => [
                 'user' => $user,
@@ -41,8 +42,16 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
-            'status' => 'success',
+            'success' => true,
             'message' => 'Logout berhasil'
+        ]);
+    }
+
+    public function profile(Request $request)
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $request->user()
         ]);
     }
 }
