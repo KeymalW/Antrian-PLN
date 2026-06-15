@@ -20,6 +20,7 @@ class DashboardController extends Controller
             'total' => (clone $query)->count(),
             'waiting' => (clone $query)->where('status', 'waiting')->count(),
             'called' => (clone $query)->where('status', 'called')->count(),
+            'serving' => (clone $query)->where('status', 'serving')->count(),
             'completed' => (clone $query)->where('status', 'completed')->count(),
             'skipped' => (clone $query)->where('status', 'skipped')->count(),
         ];

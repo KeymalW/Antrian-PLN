@@ -13,6 +13,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auth/profile', [AuthController::class, 'profile']);
 
     Route::put('/queue/{id}/call', [QueueController::class, 'callQueue']);
+    Route::put('/queue/{id}/serve', [QueueController::class, 'serveQueue']);
     Route::put('/queue/{id}/skip', [QueueController::class, 'skipQueue']);
     Route::put('/queue/{id}/complete', [QueueController::class, 'completeQueue']);
     Route::post('/queue/clear-history', [QueueController::class, 'clearHistory']);

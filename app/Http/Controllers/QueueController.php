@@ -24,13 +24,7 @@ class QueueController extends Controller
         $query = Antrian::whereDate('tanggal', Carbon::today());
 
         if ($request->has('status')) {
-            $status = $request->status;
-
-            if ($status === 'serving') {
-                $query->where('status', 'called');
-            } else {
-                $query->where('status', $status);
-            }
+            $query->where('status', $request->status);
         }
 
         if ($request->has('serviceType')) {
@@ -101,7 +95,7 @@ class QueueController extends Controller
         $counterNumber = (int) $request->counterNumber;
         $today = Carbon::today();
 
-        Antrian::where('status', 'called')
+        Antrian::whereIn('status', ['called', 'serving'])
             ->where('counter_number', $counterNumber)
             ->whereDate('tanggal', $today)
             ->update(['status' => 'completed', 'completed_at' => now()]);
@@ -116,6 +110,29 @@ class QueueController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Antrian dipanggil ke Loket {$counterNumber}",
+            'data' => $antrian,
+        ]);
+    }
+
+    public function serveQueue($id)
+    {
+        $antrian = Antrian::findOrFail($id);
+
+        if ($antrian->status !== 'called') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Antrian harus dalam status dipanggil sebelum dilayani',
+            ], 400);
+        }
+
+        $antrian->update([
+            'status' => 'serving',
+            'serving_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Antrian sedang dilayani',
             'data' => $antrian,
         ]);
     }
@@ -137,6 +154,14 @@ class QueueController extends Controller
     public function completeQueue($id)
     {
         $antrian = Antrian::findOrFail($id);
+
+        if (!in_array($antrian->status, ['called', 'serving'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Antrian harus dalam status dipanggil atau dilayani',
+            ], 400);
+        }
+
         $antrian->update([
             'status' => 'completed',
             'completed_at' => now(),
@@ -156,6 +181,7 @@ class QueueController extends Controller
         $total = Antrian::whereDate('tanggal', $today)->count();
         $waiting = Antrian::whereDate('tanggal', $today)->where('status', 'waiting')->count();
         $called = Antrian::whereDate('tanggal', $today)->where('status', 'called')->count();
+        $serving = Antrian::whereDate('tanggal', $today)->where('status', 'serving')->count();
         $completed = Antrian::whereDate('tanggal', $today)->where('status', 'completed')->count();
         $skipped = Antrian::whereDate('tanggal', $today)->where('status', 'skipped')->count();
 
@@ -165,7 +191,7 @@ class QueueController extends Controller
                 'total' => $total,
                 'waiting' => $waiting,
                 'called' => $called,
-                'serving' => $called,
+                'serving' => $serving,
                 'completed' => $completed,
                 'skipped' => $skipped,
             ]
@@ -191,7 +217,7 @@ class QueueController extends Controller
 
     public function lastCalled(Request $request, $counterNumber)
     {
-        $antrian = Antrian::where('status', 'called')
+        $antrian = Antrian::whereIn('status', ['called', 'serving'])
             ->where('counter_number', (int) $counterNumber)
             ->whereDate('tanggal', Carbon::today())
             ->latest('called_at')

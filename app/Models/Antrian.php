@@ -16,11 +16,13 @@ class Antrian extends Model
         'status',
         'counter_number',
         'called_at',
+        'serving_at',
         'completed_at',
     ];
 
     protected $casts = [
         'called_at' => 'datetime',
+        'serving_at' => 'datetime',
         'completed_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -36,6 +38,7 @@ class Antrian extends Model
             'counterNumber' => $this->counter_number !== null ? (int) $this->counter_number : null,
             'createdAt' => $this->created_at ? $this->created_at->toIso8601String() : null,
             'calledAt' => $this->called_at ? $this->called_at->toIso8601String() : null,
+            'servingAt' => $this->serving_at ? $this->serving_at->toIso8601String() : null,
             'completedAt' => $this->completed_at ? $this->completed_at->toIso8601String() : null,
         ];
     }
