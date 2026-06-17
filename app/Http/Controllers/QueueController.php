@@ -34,7 +34,7 @@ class QueueController extends Controller
         $perPage = (int) $request->input('perPage', 50);
         $page = (int) $request->input('page', 1);
 
-        $antrians = $query->orderBy('id', 'asc')->paginate($perPage, ['*'], 'page', $page);
+        $antrians = $query->orderBy('created_at', 'asc')->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'success' => true,
@@ -239,11 +239,59 @@ class QueueController extends Controller
 
     public function clearHistory()
     {
-        Antrian::whereDate('tanggal', '<', Carbon::today())->delete();
+        Antrian::whereIn('status', ['completed', 'skipped'])->delete();
 
         return response()->json([
             'success' => true,
             'message' => 'Riwayat antrian dibersihkan',
+        ]);
+    }
+
+    public function getTrash()
+    {
+        $antrians = Antrian::whereIn('status', ['completed', 'skipped'])
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $antrians,
+        ]);
+    }
+
+    public function emptyTrash()
+    {
+        Antrian::whereIn('status', ['completed', 'skipped'])->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sampah berhasil dikosongkan',
+        ]);
+    }
+
+    public function restore($id)
+    {
+        $antrian = Antrian::findOrFail($id);
+
+        if (!in_array($antrian->status, ['completed', 'skipped'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hanya antrian completed/skipped yang bisa direstore',
+            ], 400);
+        }
+
+        $antrian->update([
+            'status' => 'waiting',
+            'counter_number' => null,
+            'called_at' => null,
+            'serving_at' => null,
+            'completed_at' => null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Antrian berhasil direstore',
+            'data' => $antrian,
         ]);
     }
 }

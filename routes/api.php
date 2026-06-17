@@ -16,6 +16,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/queue/{id}/serve', [QueueController::class, 'serveQueue']);
     Route::put('/queue/{id}/skip', [QueueController::class, 'skipQueue']);
     Route::put('/queue/{id}/complete', [QueueController::class, 'completeQueue']);
+    Route::put('/queue/{id}/restore', [QueueController::class, 'restore']);
+    Route::get('/queue/trash', [QueueController::class, 'getTrash']);
+    Route::delete('/queue/trash', [QueueController::class, 'emptyTrash']);
     Route::post('/queue/clear-history', [QueueController::class, 'clearHistory']);
 
     Route::get('/dashboard/analitik', [DashboardController::class, 'analitik']);
