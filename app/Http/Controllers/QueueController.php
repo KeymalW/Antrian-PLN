@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Antrian;
+use App\Services\WebSocketService;
 use Carbon\Carbon;
 
 class QueueController extends Controller
@@ -17,6 +18,40 @@ class QueueController extends Controller
             'informasi' => 'I',
             default => 'A',
         };
+    }
+
+    private function getStats(): array
+    {
+        $today = now()->toDateString();
+
+        return [
+            'total' => Antrian::whereDate('tanggal', $today)->count(),
+            'waiting' => Antrian::whereDate('tanggal', $today)->where('status', 'waiting')->count(),
+            'called' => Antrian::whereDate('tanggal', $today)->where('status', 'called')->count(),
+            'serving' => Antrian::whereDate('tanggal', $today)->where('status', 'serving')->count(),
+            'completed' => Antrian::whereDate('tanggal', $today)->where('status', 'completed')->count(),
+            'skipped' => Antrian::whereDate('tanggal', $today)->where('status', 'skipped')->count(),
+        ];
+    }
+
+    private function broadcast(string $type, $payload): void
+    {
+        try {
+            app(WebSocketService::class)->broadcast($type, $payload);
+        } catch (\Throwable) {
+            // silent
+        }
+    }
+
+    private function broadcastTicket(string $event, Antrian $ticket): void
+    {
+        $this->broadcast($event, $ticket->fresh()->toArray());
+    }
+
+    private function broadcastAll(Antrian $ticket, string $event): void
+    {
+        $this->broadcastTicket($event, $ticket);
+        $this->broadcast('stats_update', $this->getStats());
     }
 
     public function index(Request $request)
@@ -80,6 +115,8 @@ class QueueController extends Controller
             'status' => 'waiting',
         ]);
 
+        $this->broadcastAll($antrian, 'queue_update');
+
         return response()->json([
             'success' => true,
             'data' => $antrian,
@@ -95,17 +132,26 @@ class QueueController extends Controller
         $counterNumber = (int) $request->counterNumber;
         $today = Carbon::today();
 
+        $antrian = Antrian::find($id);
+        if (!$antrian) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Antrian tidak ditemukan',
+            ], 404);
+        }
+
         Antrian::whereIn('status', ['called', 'serving'])
             ->where('counter_number', $counterNumber)
             ->whereDate('tanggal', $today)
             ->update(['status' => 'completed', 'completed_at' => now()]);
 
-        $antrian = Antrian::findOrFail($id);
         $antrian->update([
             'status' => 'called',
             'counter_number' => $counterNumber,
             'called_at' => now(),
         ]);
+
+        $this->broadcastAll($antrian, 'queue_call');
 
         return response()->json([
             'success' => true,
@@ -116,7 +162,13 @@ class QueueController extends Controller
 
     public function serveQueue($id)
     {
-        $antrian = Antrian::findOrFail($id);
+        $antrian = Antrian::find($id);
+        if (!$antrian) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Antrian tidak ditemukan',
+            ], 404);
+        }
 
         if ($antrian->status !== 'called') {
             return response()->json([
@@ -130,6 +182,8 @@ class QueueController extends Controller
             'serving_at' => now(),
         ]);
 
+        $this->broadcastAll($antrian, 'queue_update');
+
         return response()->json([
             'success' => true,
             'message' => 'Antrian sedang dilayani',
@@ -139,10 +193,19 @@ class QueueController extends Controller
 
     public function skipQueue($id)
     {
-        $antrian = Antrian::findOrFail($id);
+        $antrian = Antrian::find($id);
+        if (!$antrian) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Antrian tidak ditemukan',
+            ], 404);
+        }
+
         $antrian->update([
             'status' => 'skipped'
         ]);
+
+        $this->broadcastAll($antrian, 'queue_skip');
 
         return response()->json([
             'success' => true,
@@ -153,7 +216,13 @@ class QueueController extends Controller
 
     public function completeQueue($id)
     {
-        $antrian = Antrian::findOrFail($id);
+        $antrian = Antrian::find($id);
+        if (!$antrian) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Antrian tidak ditemukan',
+            ], 404);
+        }
 
         if (!in_array($antrian->status, ['called', 'serving'])) {
             return response()->json([
@@ -167,6 +236,8 @@ class QueueController extends Controller
             'completed_at' => now(),
         ]);
 
+        $this->broadcastAll($antrian, 'queue_complete');
+
         return response()->json([
             'success' => true,
             'message' => 'Antrian selesai dilayani',
@@ -176,25 +247,9 @@ class QueueController extends Controller
 
     public function stats()
     {
-        $today = now()->toDateString();
-
-        $total = Antrian::whereDate('tanggal', $today)->count();
-        $waiting = Antrian::whereDate('tanggal', $today)->where('status', 'waiting')->count();
-        $called = Antrian::whereDate('tanggal', $today)->where('status', 'called')->count();
-        $serving = Antrian::whereDate('tanggal', $today)->where('status', 'serving')->count();
-        $completed = Antrian::whereDate('tanggal', $today)->where('status', 'completed')->count();
-        $skipped = Antrian::whereDate('tanggal', $today)->where('status', 'skipped')->count();
-
         return response()->json([
             'success' => true,
-            'data' => [
-                'total' => $total,
-                'waiting' => $waiting,
-                'called' => $called,
-                'serving' => $serving,
-                'completed' => $completed,
-                'skipped' => $skipped,
-            ]
+            'data' => $this->getStats(),
         ]);
     }
 
@@ -241,6 +296,8 @@ class QueueController extends Controller
     {
         Antrian::whereIn('status', ['completed', 'skipped'])->delete();
 
+        $this->broadcast('stats_update', $this->getStats());
+
         return response()->json([
             'success' => true,
             'message' => 'Riwayat antrian dibersihkan',
@@ -263,6 +320,8 @@ class QueueController extends Controller
     {
         Antrian::whereIn('status', ['completed', 'skipped'])->delete();
 
+        $this->broadcast('stats_update', $this->getStats());
+
         return response()->json([
             'success' => true,
             'message' => 'Sampah berhasil dikosongkan',
@@ -271,7 +330,13 @@ class QueueController extends Controller
 
     public function restore($id)
     {
-        $antrian = Antrian::findOrFail($id);
+        $antrian = Antrian::find($id);
+        if (!$antrian) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Antrian tidak ditemukan',
+            ], 404);
+        }
 
         if (!in_array($antrian->status, ['completed', 'skipped'])) {
             return response()->json([
@@ -287,6 +352,8 @@ class QueueController extends Controller
             'serving_at' => null,
             'completed_at' => null,
         ]);
+
+        $this->broadcastAll($antrian, 'queue_update');
 
         return response()->json([
             'success' => true,
