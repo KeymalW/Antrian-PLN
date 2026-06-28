@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\QueueController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\SettingsController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -23,6 +24,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/dashboard/analitik', [DashboardController::class, 'analitik']);
     Route::get('/dashboard/export', [DashboardController::class, 'export']);
+
+    Route::get('/settings/videos', [SettingsController::class, 'getVideos']);
+    Route::post('/settings/videos', [SettingsController::class, 'uploadVideo']);
+    Route::delete('/settings/videos/{filename}', [SettingsController::class, 'deleteVideo']);
 });
 
 Route::get('/queue', [QueueController::class, 'index']);
