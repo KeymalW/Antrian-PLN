@@ -12,10 +12,9 @@ class QueueController extends Controller
     private function getPrefix(string $serviceType): string
     {
         return match ($serviceType) {
-            'pembayaran' => 'P',
             'pengaduan' => 'G',
-            'pendaftaran' => 'D',
-            'informasi' => 'I',
+            'pb_pd_migrasi' => 'M',
+            'p2tl' => 'T',
             default => 'A',
         };
     }
@@ -86,7 +85,7 @@ class QueueController extends Controller
     public function takeTicket(Request $request)
     {
         $request->validate([
-            'serviceType' => 'required|in:pembayaran,pengaduan,pendaftaran,informasi',
+            'serviceType' => 'required|in:pengaduan,pb_pd_migrasi,p2tl',
         ]);
 
         $serviceType = $request->serviceType;

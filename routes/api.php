@@ -25,10 +25,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/dashboard/analitik', [DashboardController::class, 'analitik']);
     Route::get('/dashboard/export', [DashboardController::class, 'export']);
 
-    Route::get('/settings/videos', [SettingsController::class, 'getVideos']);
+    Route::post('/settings/video-volume', [SettingsController::class, 'setVideoVolume']);
+
     Route::post('/settings/videos', [SettingsController::class, 'uploadVideo']);
     Route::delete('/settings/videos/{filename}', [SettingsController::class, 'deleteVideo']);
 });
+
+// Publik (tanpa auth)
+Route::get('/settings/video-volume', [SettingsController::class, 'getVideoVolume']);
+Route::get('/settings/videos', [SettingsController::class, 'getVideos']);
 
 Route::get('/queue', [QueueController::class, 'index']);
 Route::post('/queue/take', [QueueController::class, 'takeTicket']);

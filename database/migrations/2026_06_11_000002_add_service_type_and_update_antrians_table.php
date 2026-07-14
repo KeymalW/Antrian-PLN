@@ -10,7 +10,7 @@ class AddServiceTypeAndUpdateAntriansTable extends Migration
     public function up()
     {
         Schema::table('antrians', function (Blueprint $table) {
-            $table->string('service_type')->default('pembayaran')->after('nomor_antrian');
+            $table->string('service_type')->default('pengaduan')->after('nomor_antrian');
             $table->unsignedTinyInteger('counter_number')->nullable()->after('status');
             $table->timestamp('completed_at')->nullable()->after('panggil_at');
         });

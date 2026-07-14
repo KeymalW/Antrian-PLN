@@ -8,6 +8,55 @@ use Illuminate\Support\Facades\Log;
 
 class SettingsController extends Controller
 {
+    private function getSettingsPath(): string
+    {
+        return storage_path('app/settings/video-volume.json');
+    }
+
+    public function getVideoVolume()
+    {
+        $path = $this->getSettingsPath();
+
+        if (!file_exists(dirname($path))) {
+            mkdir(dirname($path), 0755, true);
+        }
+
+        $volume = 0.2;
+
+        if (file_exists($path)) {
+            $data = json_decode(file_get_contents($path), true);
+            $volume = (float) ($data['volume'] ?? $volume);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => ['volume' => $volume],
+        ]);
+    }
+
+    public function setVideoVolume(Request $request)
+    {
+        $request->validate([
+            'volume' => 'required|numeric|min:0|max:1',
+        ]);
+
+        $path = $this->getSettingsPath();
+
+        if (!file_exists(dirname($path))) {
+            mkdir(dirname($path), 0755, true);
+        }
+
+        file_put_contents($path, json_encode([
+            'volume' => (float) $request->volume,
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Volume berhasil disimpan',
+            'data' => ['volume' => (float) $request->volume],
+        ]);
+    }
+
     public function getVideos()
     {
         Storage::disk('public')->makeDirectory('monitor');
