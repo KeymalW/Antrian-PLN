@@ -38,5 +38,7 @@ Route::get('/settings/videos', [SettingsController::class, 'getVideos']);
 Route::get('/queue', [QueueController::class, 'index']);
 Route::post('/queue/take', [QueueController::class, 'takeTicket']);
 Route::get('/queue/stats', [QueueController::class, 'stats']);
+Route::get('/queue/weekly', [QueueController::class, 'weekly']);
+Route::get('/queue/active', [QueueController::class, 'activeCall']);
 Route::get('/queue/last-called/{counterNumber}', [QueueController::class, 'lastCalled']);
 Route::get('/queue/{id}', [QueueController::class, 'show']);

@@ -277,9 +277,21 @@ class QueueController extends Controller
             ->latest('called_at')
             ->first();
 
+        return response()->json([
+            'success' => true,
+            'data' => $antrian,
+        ]);
+    }
+
+    public function activeCall()
+    {
+        $antrian = Antrian::whereIn('status', ['called', 'serving'])
+            ->whereDate('tanggal', Carbon::today())
+            ->latest('called_at')
+            ->first();
+
         if (!$antrian) {
             $antrian = Antrian::where('status', 'completed')
-                ->where('counter_number', (int) $counterNumber)
                 ->whereDate('tanggal', Carbon::today())
                 ->latest('completed_at')
                 ->first();
@@ -287,7 +299,26 @@ class QueueController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $antrian,
+            'data' => $antrian ? [
+                'id' => (string) $antrian->id,
+                'nomor_antrian' => $antrian->nomor_antrian,
+                'loket' => $antrian->counter_number,
+            ] : null,
+        ]);
+    }
+
+    public function weekly()
+    {
+        $today = Carbon::today();
+        $dayOfWeek = $today->dayOfWeek;
+        $monday = $today->copy()->subDays($dayOfWeek === Carbon::SUNDAY ? 6 : $dayOfWeek - 1)->startOfDay();
+        $friday = $monday->copy()->addDays(4)->endOfDay();
+
+        $tickets = Antrian::whereBetween('created_at', [$monday, $friday])->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $tickets,
         ]);
     }
 
