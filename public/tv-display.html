@@ -91,10 +91,10 @@
         async function cekAntrianAktif() {
             try {
                 // Tembak API Publik kita (nggak butuh token login, ini khusus display TV)
-                let response = await fetch('/api/antrian/aktif');
+                let response = await fetch('/api/queue/active');
                 let result = await response.json();
 
-                if (result.status === 'success' && result.data) {
+                if (result.success && result.data) {
                     let antrian = result.data;
 
                     // Kalau ada antrian yang ID-nya beda dari sebelumnya (antrian baru dipanggil)
