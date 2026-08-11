@@ -122,6 +122,15 @@ class QueueController extends Controller
         ], 201);
     }
 
+    private function getGroup(string $serviceType): string
+    {
+        return match ($serviceType) {
+            'pengaduan', 'pb_pd_migrasi' => 'group_a',
+            'p2tl' => 'group_b',
+            default => 'group_a',
+        };
+    }
+
     public function callQueue(Request $request, $id)
     {
         $request->validate([
@@ -139,7 +148,15 @@ class QueueController extends Controller
             ], 404);
         }
 
+        $calledGroup = $this->getGroup($antrian->service_type);
+
+        $conflictingTypes = collect(['pengaduan', 'pb_pd_migrasi', 'p2tl'])
+            ->filter(fn(string $type) => $this->getGroup($type) === $calledGroup)
+            ->values()
+            ->all();
+
         Antrian::whereIn('status', ['called', 'serving'])
+            ->whereIn('service_type', $conflictingTypes)
             ->where('counter_number', $counterNumber)
             ->whereDate('tanggal', $today)
             ->update(['status' => 'completed', 'completed_at' => now()]);
