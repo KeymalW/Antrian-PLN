@@ -13,22 +13,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/profile', [AuthController::class, 'profile']);
 
-    Route::put('/queue/{id}/call', [QueueController::class, 'callQueue']);
-    Route::put('/queue/{id}/serve', [QueueController::class, 'serveQueue']);
-    Route::put('/queue/{id}/skip', [QueueController::class, 'skipQueue']);
-    Route::put('/queue/{id}/complete', [QueueController::class, 'completeQueue']);
-    Route::put('/queue/{id}/restore', [QueueController::class, 'restore']);
-    Route::get('/queue/trash', [QueueController::class, 'getTrash']);
-    Route::delete('/queue/trash', [QueueController::class, 'emptyTrash']);
-    Route::post('/queue/clear-history', [QueueController::class, 'clearHistory']);
+    Route::middleware('role:petugas,admin')->group(function () {
+        Route::put('/queue/{id}/call', [QueueController::class, 'callQueue']);
+        Route::put('/queue/{id}/serve', [QueueController::class, 'serveQueue']);
+        Route::put('/queue/{id}/skip', [QueueController::class, 'skipQueue']);
+        Route::put('/queue/{id}/complete', [QueueController::class, 'completeQueue']);
+        Route::put('/queue/{id}/restore', [QueueController::class, 'restore']);
+        Route::get('/queue/trash', [QueueController::class, 'getTrash']);
+        Route::delete('/queue/trash', [QueueController::class, 'emptyTrash']);
+        Route::post('/queue/clear-history', [QueueController::class, 'clearHistory']);
+    });
 
-    Route::get('/dashboard/analitik', [DashboardController::class, 'analitik']);
-    Route::get('/dashboard/export', [DashboardController::class, 'export']);
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/dashboard/analitik', [DashboardController::class, 'analitik']);
+        Route::get('/dashboard/export', [DashboardController::class, 'export']);
 
-    Route::post('/settings/video-volume', [SettingsController::class, 'setVideoVolume']);
+        Route::post('/settings/video-volume', [SettingsController::class, 'setVideoVolume']);
 
-    Route::post('/settings/videos', [SettingsController::class, 'uploadVideo']);
-    Route::delete('/settings/videos/{filename}', [SettingsController::class, 'deleteVideo']);
+        Route::post('/settings/videos', [SettingsController::class, 'uploadVideo']);
+        Route::delete('/settings/videos/{filename}', [SettingsController::class, 'deleteVideo']);
+    });
 });
 
 // Publik (tanpa auth)

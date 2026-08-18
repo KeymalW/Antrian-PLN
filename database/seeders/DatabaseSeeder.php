@@ -10,42 +10,42 @@ class DatabaseSeeder extends Seeder
     public function run()
     {
         User::updateOrCreate(
-            ['username' => 'admin'],
+            ['username' => 'adminulpsubang'],
             [
-                'name' => 'Admin PLN',
-                'password' => bcrypt('admin123'),
+                'name' => 'Admin ULP Subang',
+                'password' => bcrypt('adminulpsubang'),
                 'role' => 'admin',
                 'counter_number' => null,
             ]
         );
 
         User::updateOrCreate(
-            ['username' => 'petugas1'],
+            ['username' => 'petugasulpsubang'],
             [
-                'name' => 'Petugas Loket 1',
-                'password' => bcrypt('petugas123'),
+                'name' => 'Petugas ULP Subang',
+                'password' => bcrypt('petugasulpsubang'),
                 'role' => 'petugas',
                 'counter_number' => 1,
             ]
         );
 
         User::updateOrCreate(
-            ['username' => 'petugas2'],
+            ['username' => 'kioskulpsubang'],
             [
-                'name' => 'Petugas Loket 2',
-                'password' => bcrypt('petugas123'),
-                'role' => 'petugas',
-                'counter_number' => 2,
+                'name' => 'Kiosk ULP Subang',
+                'password' => bcrypt('kioskulpsubang'),
+                'role' => 'kiosk',
+                'counter_number' => null,
             ]
         );
 
         User::updateOrCreate(
-            ['username' => 'petugas3'],
+            ['username' => 'tvulpsubang'],
             [
-                'name' => 'Petugas Loket 3',
-                'password' => bcrypt('petugas123'),
-                'role' => 'petugas',
-                'counter_number' => 3,
+                'name' => 'TV Display ULP Subang',
+                'password' => bcrypt('tvulpsubang'),
+                'role' => 'tvdisplay',
+                'counter_number' => null,
             ]
         );
     }
