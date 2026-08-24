@@ -55,7 +55,22 @@ class QueueController extends Controller
 
     public function index(Request $request)
     {
-        $query = Antrian::whereDate('tanggal', Carbon::today());
+        $query = Antrian::query();
+
+        // Rentang tanggal opsional — dipakai halaman Laporan.
+        // Tanpa parameter from/to, default tetap hari ini.
+        $from = $request->input('from');
+        $to = $request->input('to');
+
+        if ($from && $to) {
+            $query->whereBetween('tanggal', [$from, $to]);
+        } elseif ($from) {
+            $query->whereDate('tanggal', '>=', $from);
+        } elseif ($to) {
+            $query->whereDate('tanggal', '<=', $to);
+        } else {
+            $query->whereDate('tanggal', Carbon::today());
+        }
 
         if ($request->has('status')) {
             $query->where('status', $request->status);

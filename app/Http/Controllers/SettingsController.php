@@ -133,4 +133,255 @@ class SettingsController extends Controller
             'message' => 'Video berhasil dihapus',
         ]);
     }
+
+    /* ================================================================
+     |  Helper JSON file store (konsisten dgn pola video-volume.json)
+     * ================================================================ */
+
+    private function readJson(string $relative, array $default): array
+    {
+        $path = storage_path('app/settings/' . $relative);
+
+        if (!file_exists(dirname($path))) {
+            mkdir(dirname($path), 0755, true);
+        }
+
+        if (!file_exists($path)) {
+            return $default;
+        }
+
+        $data = json_decode((string) file_get_contents($path), true);
+
+        return is_array($data) ? $data : $default;
+    }
+
+    private function writeJson(string $relative, array $data): void
+    {
+        $path = storage_path('app/settings/' . $relative);
+
+        if (!file_exists(dirname($path))) {
+            mkdir(dirname($path), 0755, true);
+        }
+
+        file_put_contents($path, json_encode($data));
+    }
+
+    /* ================================================================
+     |  Identitas Instansi (nama + logo)
+     * ================================================================ */
+
+    private function getGeneralData(): array
+    {
+        $data = $this->readJson('general.json', [
+            'institution_name' => 'QServe',
+            'logo_url' => '/assets/logo-pln.png',
+        ]);
+
+        return [
+            'institutionName' => $data['institution_name'] ?? 'QServe',
+            'logoUrl' => $data['logo_url'] ?? '',
+        ];
+    }
+
+    public function getGeneral()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->getGeneralData(),
+        ]);
+    }
+
+    public function updateGeneral(Request $request)
+    {
+        $request->validate([
+            'institutionName' => 'required|string|max:100',
+            'logoUrl' => 'nullable|string|max:2048',
+        ]);
+
+        $current = $this->readJson('general.json', [
+            'institution_name' => 'QServe',
+            'logo_url' => '/assets/logo-pln.png',
+        ]);
+
+        $current['institution_name'] = trim($request->input('institutionName'));
+        $current['logo_url'] = (string) $request->input('logoUrl', $current['logo_url'] ?? '');
+
+        $this->writeJson('general.json', $current);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Identitas berhasil disimpan',
+            'data' => $this->getGeneralData(),
+        ]);
+    }
+
+    public function uploadLogo(Request $request)
+    {
+        $request->validate([
+            'logo' => 'required|file|max:512',
+        ]);
+
+        $file = $request->file('logo');
+
+        $allowed = ['png', 'jpg', 'jpeg', 'svg', 'webp'];
+        $ext = strtolower($file->getClientOriginalExtension());
+
+        if (!in_array($ext, $allowed)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Format logo harus PNG, JPG, SVG, atau WEBP',
+            ], 422);
+        }
+
+        try {
+            Storage::disk('public')->makeDirectory('branding');
+
+            // Hapus logo lama dengan ekstensi berbeda agar tidak menumpuk.
+            foreach ($allowed as $old) {
+                $oldPath = 'public/branding/logo.' . $old;
+                if ($old !== $ext && Storage::exists($oldPath)) {
+                    Storage::delete($oldPath);
+                }
+            }
+
+            $file->storeAs('branding', 'logo.' . $ext, 'public');
+
+            $current = $this->readJson('general.json', [
+                'institution_name' => 'QServe',
+                'logo_url' => '/assets/logo-pln.png',
+            ]);
+            $current['logo_url'] = url('storage/branding/logo.' . $ext);
+            $this->writeJson('general.json', $current);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Logo berhasil diupload',
+                'data' => $this->getGeneralData(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Logo upload failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengupload logo'
+            ], 500);
+        }
+    }
+
+    /* ================================================================
+     |  Teks Tiket Kiosk
+     * ================================================================ */
+
+    private function getTicketTextData(): array
+    {
+        $data = $this->readJson('ticket-text.json', [
+            'header_text' => 'NOMOR ANTRIAN',
+            'sub_header_text' => 'Nomor antrian Anda',
+            'footer_message' => 'Terima kasih telah mengambil tiket.',
+        ]);
+
+        return [
+            'headerText' => $data['header_text'] ?? '',
+            'subHeaderText' => $data['sub_header_text'] ?? '',
+            'footerMessage' => $data['footer_message'] ?? '',
+        ];
+    }
+
+    public function getTicketText()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->getTicketTextData(),
+        ]);
+    }
+
+    public function updateTicketText(Request $request)
+    {
+        $request->validate([
+            'headerText' => 'required|string|max:60',
+            'subHeaderText' => 'required|string|max:80',
+            'footerMessage' => 'required|string|max:200',
+        ]);
+
+        $this->writeJson('ticket-text.json', [
+            'header_text' => trim($request->input('headerText')),
+            'sub_header_text' => trim($request->input('subHeaderText')),
+            'footer_message' => trim($request->input('footerMessage')),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Teks tiket berhasil disimpan',
+            'data' => $this->getTicketTextData(),
+        ]);
+    }
+
+    /* ================================================================
+     |  Video TV Display via Link (URL)
+     * ================================================================ */
+
+    private function mapVideoLink(array $link): array
+    {
+        return [
+            'id' => $link['id'],
+            'url' => $link['url'],
+            'filename' => $link['title'],
+            'title' => $link['title'],
+        ];
+    }
+
+    public function getVideoLinks()
+    {
+        $links = $this->readJson('video-links.json', []);
+
+        return response()->json([
+            'success' => true,
+            'data' => array_map([$this, 'mapVideoLink'], array_values($links)),
+        ]);
+    }
+
+    public function addVideoLink(Request $request)
+    {
+        $request->validate([
+            'url' => 'required|url|max:500',
+            'title' => 'nullable|string|max:100',
+        ]);
+
+        $links = $this->readJson('video-links.json', []);
+
+        $link = [
+            'id' => 'video-' . uniqid(),
+            'url' => trim($request->input('url')),
+            'title' => trim((string) $request->input('title')) ?: trim($request->input('url')),
+        ];
+
+        $links[] = $link;
+        $this->writeJson('video-links.json', $links);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Link video berhasil ditambahkan',
+            'data' => $this->mapVideoLink($link),
+        ], 201);
+    }
+
+    public function deleteVideoLink($id)
+    {
+        $links = $this->readJson('video-links.json', []);
+        $remaining = array_values(array_filter($links, fn ($link) => ($link['id'] ?? null) !== $id));
+
+        if (count($remaining) === count($links)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Link video tidak ditemukan',
+            ], 404);
+        }
+
+        $this->writeJson('video-links.json', $remaining);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Link video berhasil dihapus',
+        ]);
+    }
 }
