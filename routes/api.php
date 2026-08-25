@@ -20,6 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/queue/{id}/serve', [QueueController::class, 'serveQueue']);
         Route::put('/queue/{id}/skip', [QueueController::class, 'skipQueue']);
         Route::put('/queue/{id}/complete', [QueueController::class, 'completeQueue']);
+        Route::put('/queue/{id}/recall', [QueueController::class, 'recall']);
         Route::put('/queue/{id}/restore', [QueueController::class, 'restore']);
         Route::get('/queue/trash', [QueueController::class, 'getTrash']);
         Route::delete('/queue/trash', [QueueController::class, 'emptyTrash']);
@@ -50,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/settings/general', [SettingsController::class, 'updateGeneral']);
         Route::post('/settings/logo', [SettingsController::class, 'uploadLogo']);
         Route::post('/settings/ticket-text', [SettingsController::class, 'updateTicketText']);
+        Route::post('/settings/kiosk-text', [SettingsController::class, 'updateKioskText']);
         Route::post('/settings/video-links', [SettingsController::class, 'addVideoLink']);
         Route::delete('/settings/video-links/{id}', [SettingsController::class, 'deleteVideoLink']);
     });
@@ -61,6 +63,7 @@ Route::get('/settings/videos', [SettingsController::class, 'getVideos']);
 Route::get('/settings/video-links', [SettingsController::class, 'getVideoLinks']);
 Route::get('/settings/general', [SettingsController::class, 'getGeneral']);
 Route::get('/settings/ticket-text', [SettingsController::class, 'getTicketText']);
+Route::get('/settings/kiosk-text', [SettingsController::class, 'getKioskText']);
 Route::get('/services', [ServiceController::class, 'index']);
 
 Route::get('/queue', [QueueController::class, 'index']);

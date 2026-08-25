@@ -317,6 +317,58 @@ class SettingsController extends Controller
     }
 
     /* ================================================================
+     |  Teks Halaman Kiosk
+     * ================================================================ */
+
+    private function getKioskTextData(): array
+    {
+        $data = $this->readJson('kiosk-text.json', [
+            'welcome_text' => 'Selamat Datang di',
+            'subtitle_text' => 'Silakan pilih layanan yang Anda butuhkan',
+            'hint_text' => 'Sentuh layar untuk mencetak tiket',
+            'footer_text' => 'PT PLN (Persero) · ULP Subang',
+        ]);
+
+        return [
+            'welcomeText' => $data['welcome_text'] ?? '',
+            'subtitleText' => $data['subtitle_text'] ?? '',
+            'hintText' => $data['hint_text'] ?? '',
+            'footerText' => $data['footer_text'] ?? '',
+        ];
+    }
+
+    public function getKioskText()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->getKioskTextData(),
+        ]);
+    }
+
+    public function updateKioskText(Request $request)
+    {
+        $request->validate([
+            'welcomeText' => 'required|string|max:80',
+            'subtitleText' => 'required|string|max:120',
+            'hintText' => 'required|string|max:60',
+            'footerText' => 'required|string|max:120',
+        ]);
+
+        $this->writeJson('kiosk-text.json', [
+            'welcome_text' => trim($request->input('welcomeText')),
+            'subtitle_text' => trim($request->input('subtitleText')),
+            'hint_text' => trim($request->input('hintText')),
+            'footer_text' => trim($request->input('footerText')),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Teks kiosk berhasil disimpan',
+            'data' => $this->getKioskTextData(),
+        ]);
+    }
+
+    /* ================================================================
      |  Video TV Display via Link (URL)
      * ================================================================ */
 

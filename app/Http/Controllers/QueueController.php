@@ -4,21 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Antrian;
+use App\Models\Service;
 use App\Services\WebSocketService;
 use Carbon\Carbon;
 
 class QueueController extends Controller
 {
-    private function getPrefix(string $serviceType): string
-    {
-        return match ($serviceType) {
-            'pengaduan' => 'G',
-            'pb_pd_migrasi' => 'M',
-            'p2tl' => 'T',
-            default => 'A',
-        };
-    }
-
     private function getStats(): array
     {
         $today = now()->toDateString();
@@ -100,12 +91,12 @@ class QueueController extends Controller
     public function takeTicket(Request $request)
     {
         $request->validate([
-            'serviceType' => 'required|in:pengaduan,pb_pd_migrasi,p2tl',
+            'serviceType' => 'required|string|exists:services,code,is_active,1',
         ]);
 
-        $serviceType = $request->serviceType;
+        $serviceType = $request->input('serviceType');
         $today = Carbon::today();
-        $prefix = $this->getPrefix($serviceType);
+        $prefix = (string) (Service::where('code', $serviceType)->value('prefix') ?? 'A');
 
         $last = Antrian::whereDate('tanggal', $today)
             ->where('service_type', $serviceType)
@@ -137,13 +128,9 @@ class QueueController extends Controller
         ], 201);
     }
 
-    private function getGroup(string $serviceType): string
+    private function getGroup(string $serviceCode): string
     {
-        return match ($serviceType) {
-            'pengaduan', 'pb_pd_migrasi' => 'group_a',
-            'p2tl' => 'group_b',
-            default => 'group_a',
-        };
+        return Service::where('code', $serviceCode)->value('service_group') ?? 'group_a';
     }
 
     public function callQueue(Request $request, $id)
@@ -165,9 +152,10 @@ class QueueController extends Controller
 
         $calledGroup = $this->getGroup($antrian->service_type);
 
-        $conflictingTypes = collect(['pengaduan', 'pb_pd_migrasi', 'p2tl'])
-            ->filter(fn(string $type) => $this->getGroup($type) === $calledGroup)
-            ->values()
+        // Semua layanan dalam grup yang sama dianggap konflik,
+        // apa pun status aktifnya.
+        $conflictingTypes = Service::where('service_group', $calledGroup)
+            ->pluck('code')
             ->all();
 
         Antrian::whereIn('status', ['called', 'serving'])
@@ -273,6 +261,34 @@ class QueueController extends Controller
             'success' => true,
             'message' => 'Antrian selesai dilayani',
             'data' => $antrian,
+        ]);
+    }
+
+    public function recall($id)
+    {
+        $antrian = Antrian::find($id);
+        if (!$antrian) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Antrian tidak ditemukan',
+            ], 404);
+        }
+
+        if (!in_array($antrian->status, ['called', 'serving'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hanya antrian berstatus dipanggil/dilayani yang bisa dipanggil ulang',
+            ], 400);
+        }
+
+        // Panggil ulang tidak mengubah data — hanya menyiarkan ulang
+        // agar suara pengumuman keluar dari TV display.
+        $this->broadcastTicket('queue_recall', $antrian);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Antrian dipanggil ulang',
+            'data' => $antrian->fresh(),
         ]);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Auth\AuthenticationException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -37,5 +38,18 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+    }
+
+    protected function unauthenticated($request, AuthenticationException $exception)
+    {
+        // Semua rute api/* selalu merespons JSON — tanpa redirect web.
+        if ($request->is('api/*')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak terautentikasi',
+            ], 401);
+        }
+
+        return parent::unauthenticated($request, $exception);
     }
 }
