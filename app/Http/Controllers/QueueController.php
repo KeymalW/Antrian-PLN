@@ -128,11 +128,6 @@ class QueueController extends Controller
         ], 201);
     }
 
-    private function getGroup(string $serviceCode): string
-    {
-        return Service::where('code', $serviceCode)->value('service_group') ?? 'group_a';
-    }
-
     public function callQueue(Request $request, $id)
     {
         $request->validate([
@@ -150,19 +145,24 @@ class QueueController extends Controller
             ], 404);
         }
 
-        $calledGroup = $this->getGroup($antrian->service_type);
+        // Model jalur per layanan: layanan yang sama hanya boleh memiliki
+        // satu antrian aktif di satu loket — layanan berbeda tetap bebas.
+        $service = Service::where('code', $antrian->service_type)->first();
+        $serviceName = $service?->name ?? $antrian->service_type;
 
-        // Semua layanan dalam grup yang sama dianggap konflik,
-        // apa pun status aktifnya.
-        $conflictingTypes = Service::where('service_group', $calledGroup)
-            ->pluck('code')
-            ->all();
-
-        Antrian::whereIn('status', ['called', 'serving'])
-            ->whereIn('service_type', $conflictingTypes)
+        $activeDuplicate = Antrian::whereIn('status', ['called', 'serving'])
             ->where('counter_number', $counterNumber)
+            ->where('service_type', $antrian->service_type)
             ->whereDate('tanggal', $today)
-            ->update(['status' => 'completed', 'completed_at' => now()]);
+            ->orderByDesc('called_at')
+            ->first();
+
+        if ($activeDuplicate) {
+            return response()->json([
+                'success' => false,
+                'message' => "Masih ada antrian aktif {$serviceName} ({$activeDuplicate->nomor_antrian}) di Loket {$counterNumber}. Selesaikan atau lewati terlebih dahulu.",
+            ], 409);
+        }
 
         $antrian->update([
             'status' => 'called',
