@@ -33,6 +33,7 @@ class AccountController extends Controller
             'password' => Hash::make($request->input('password')),
             'role' => $request->input('role'),
             'counter_number' => $request->input('counterNumber'),
+            'tenant_id' => $request->user()->tenant_id,
         ]);
 
         return response()->json([

@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\BelongsToTenant;
 
 class Antrian extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected $fillable = [
         'nomor_antrian',
@@ -18,6 +19,7 @@ class Antrian extends Model
         'called_at',
         'serving_at',
         'completed_at',
+        'tenant_id',
     ];
 
     protected $casts = [

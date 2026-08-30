@@ -3,14 +3,36 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
 class SettingsController extends Controller
 {
+    private function tenantId(): ?int
+    {
+        $user = Auth::user();
+        return $user && isset($user->tenant_id) ? (int) $user->tenant_id : null;
+    }
+
+    private function tenantSettingsDir(): ?string
+    {
+        $tid = $this->tenantId();
+        return $tid ? storage_path('app/settings/tenants/' . $tid) : null;
+    }
+
+    private function resolveSettingsPath(string $relative): string
+    {
+        $tenantDir = $this->tenantSettingsDir();
+        if ($tenantDir) {
+            return $tenantDir . '/' . $relative;
+        }
+        return storage_path('app/settings/' . $relative);
+    }
+
     private function getSettingsPath(): string
     {
-        return storage_path('app/settings/video-volume.json');
+        return $this->resolveSettingsPath('video-volume.json');
     }
 
     public function getVideoVolume()
@@ -140,7 +162,13 @@ class SettingsController extends Controller
 
     private function readJson(string $relative, array $default): array
     {
-        $path = storage_path('app/settings/' . $relative);
+        $path = $this->resolveSettingsPath($relative);
+        // Fallback to global file if tenant file does not exist (for backward compat / public view)
+        if (!file_exists($path)) {
+            $global = storage_path('app/settings/' . $relative);
+            if (file_exists($global)) $path = $global;
+            else return $default;
+        }
 
         if (!file_exists(dirname($path))) {
             mkdir(dirname($path), 0755, true);
@@ -157,7 +185,7 @@ class SettingsController extends Controller
 
     private function writeJson(string $relative, array $data): void
     {
-        $path = storage_path('app/settings/' . $relative);
+        $path = $this->resolveSettingsPath($relative);
 
         if (!file_exists(dirname($path))) {
             mkdir(dirname($path), 0755, true);
@@ -234,23 +262,26 @@ class SettingsController extends Controller
         }
 
         try {
-            Storage::disk('public')->makeDirectory('branding');
+            $tenantId = $this->tenantId();
+            $brandingDir = $tenantId ? 'branding/' . $tenantId : 'branding';
+
+            Storage::disk('public')->makeDirectory($brandingDir);
 
             // Hapus logo lama dengan ekstensi berbeda agar tidak menumpuk.
             foreach ($allowed as $old) {
-                $oldPath = 'public/branding/logo.' . $old;
+                $oldPath = 'public/' . $brandingDir . '/logo.' . $old;
                 if ($old !== $ext && Storage::exists($oldPath)) {
                     Storage::delete($oldPath);
                 }
             }
 
-            $file->storeAs('branding', 'logo.' . $ext, 'public');
+            $file->storeAs($brandingDir, 'logo.' . $ext, 'public');
 
             $current = $this->readJson('general.json', [
                 'institution_name' => 'QServe',
                 'logo_url' => '/assets/logo-pln.png',
             ]);
-            $current['logo_url'] = url('storage/branding/logo.' . $ext);
+            $current['logo_url'] = url('storage/' . $brandingDir . '/logo.' . $ext);
             $this->writeJson('general.json', $current);
 
             return response()->json([

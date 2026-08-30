@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\Concerns\BelongsToTenant;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, BelongsToTenant;
 
     protected $fillable = [
         'name',
@@ -18,6 +19,7 @@ class User extends Authenticatable
         'password',
         'role',
         'counter_number',
+        'tenant_id',
     ];
 
     protected $hidden = [
@@ -36,6 +38,8 @@ class User extends Authenticatable
             'name' => $this->name,
             'role' => $this->role ?? 'petugas',
             'counterNumber' => $this->counter_number !== null ? (int) $this->counter_number : null,
+            'tenantId' => $this->tenant_id !== null ? (int) $this->tenant_id : null,
+            'tenantSlug' => $this->relationLoaded('tenant') && $this->tenant ? $this->tenant->slug : null,
         ];
     }
 }

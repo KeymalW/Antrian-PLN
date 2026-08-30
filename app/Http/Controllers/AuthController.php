@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use App\Models\Tenant;
 use App\Models\User;
 
 class AuthController extends Controller
@@ -57,7 +60,10 @@ class AuthController extends Controller
 
     public function adminExists()
     {
-        $exists = User::where('role', 'admin')->exists();
+        // For multi-tenant: FE shows register button only when no tenant exists at all (first bootstrap)
+        // Once at least one tenant exists, global register is still allowed for new companies, but FE hides button after first company for simplicity of PKL (5 max)
+        // Keep simple: exists = Tenant::exists() ? true : User::where('role','admin')->exists() for backward compat
+        $exists = Tenant::exists();
 
         return response()->json([
             'success' => true,
@@ -67,35 +73,103 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        if (User::where('role', 'admin')->exists()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Admin sudah ada. Silakan login atau hubungi admin untuk membuat akun baru.',
-            ], 403);
-        }
-
+        // Multi-tenant: each company registers its own tenant+admin. Allow up to 5 tenants for PKL.
+        // No global single-admin block — check company slug uniqueness and tenant limit.
         $request->validate([
+            'companyName' => 'required|string|max:100',
             'name' => 'required|string|max:100',
             'username' => 'required|string|min:3|max:50|alpha_dash|unique:users,username',
             'password' => 'required|string|min:6|confirmed',
         ]);
 
-        $user = User::create([
-            'name' => trim($request->input('name')),
-            'username' => strtolower(trim($request->input('username'))),
-            'password' => Hash::make($request->input('password')),
-            'role' => 'admin',
-        ]);
+        if (Tenant::count() >= 5) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Batas perusahaan tercapai (maks 5 untuk demo PKL).',
+            ], 403);
+        }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $companyName = trim($request->input('companyName'));
+        $slug = Str::slug($companyName);
+        if (empty($slug)) $slug = 'company-' . Str::random(4);
+        $baseSlug = $slug;
+        $i = 2;
+        while (Tenant::where('slug', $slug)->exists()) {
+            $slug = $baseSlug . '-' . $i++;
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Registrasi admin berhasil',
-            'data' => [
-                'user' => $user,
-                'token' => $token,
-            ],
-        ], 201);
+        return DB::transaction(function () use ($request, $companyName, $slug) {
+            $tenant = Tenant::create([
+                'name' => $companyName,
+                'slug' => $slug,
+            ]);
+
+            $user = User::create([
+                'name' => trim($request->input('name')),
+                'username' => strtolower(trim($request->input('username'))),
+                'password' => Hash::make($request->input('password')),
+                'role' => 'admin',
+                'tenant_id' => $tenant->id,
+            ]);
+
+            // Seed default 3 services for this tenant (qserve-default already has them via backfill, new tenants need them)
+            $defaults = [
+                ['name' => 'Pengaduan', 'code' => 'pengaduan', 'prefix' => 'G', 'counter_number' => 1, 'icon' => 'megaphone'],
+                ['name' => 'PB/PD/Migrasi', 'code' => 'pb_pd_migrasi', 'prefix' => 'M', 'counter_number' => 2, 'icon' => 'plug-zap'],
+                ['name' => 'P2TL', 'code' => 'p2tl', 'prefix' => 'T', 'counter_number' => 3, 'icon' => 'wrench'],
+            ];
+            foreach ($defaults as $svc) {
+                \App\Models\Service::create([
+                    'name' => $svc['name'],
+                    'code' => $svc['code'],
+                    'prefix' => $svc['prefix'],
+                    'counter_number' => $svc['counter_number'],
+                    'icon' => $svc['icon'],
+                    'service_group' => 'group_a',
+                    'is_active' => true,
+                    'show_in_kiosk' => true,
+                    'tenant_id' => $tenant->id,
+                ]);
+            }
+
+            // Seed per-tenant file settings from default tenant's files if exists, otherwise defaults
+            $this->seedTenantSettings($tenant->id);
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+            $user->load('tenant');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Registrasi perusahaan & admin berhasil',
+                'data' => [
+                    'user' => $user,
+                    'token' => $token,
+                    'tenant' => $tenant,
+                ],
+            ], 201);
+        });
+    }
+
+    private function seedTenantSettings(int $tenantId): void
+    {
+        $defaultTenantId = \App\Models\Tenant::where('slug', 'qserve-default')->value('id');
+        $files = ['general.json', 'ticket-text.json', 'kiosk-text.json'];
+        foreach ($files as $file) {
+            $src = storage_path('app/settings/' . $file);
+            $dstDir = storage_path('app/settings/tenants/' . $tenantId);
+            $dst = $dstDir . '/' . $file;
+            if (file_exists($dst)) continue;
+            if (!is_dir($dstDir)) mkdir($dstDir, 0755, true);
+            if ($defaultTenantId) {
+                $srcTenant = storage_path('app/settings/tenants/' . $defaultTenantId . '/' . $file);
+                if (file_exists($srcTenant)) {
+                    copy($srcTenant, $dst);
+                    continue;
+                }
+            }
+            if (file_exists($src)) {
+                copy($src, $dst);
+            }
+        }
     }
 }

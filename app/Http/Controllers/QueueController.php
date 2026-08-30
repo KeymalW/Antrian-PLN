@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use App\Models\Antrian;
 use App\Models\Service;
 use App\Services\WebSocketService;
@@ -10,18 +11,47 @@ use Carbon\Carbon;
 
 class QueueController extends Controller
 {
-    private function getStats(): array
+    private function getStats(?int $tenantId = null): array
     {
         $today = now()->toDateString();
-
+        $base = Antrian::withoutGlobalScope('tenant');
+        if ($tenantId) $base->where('tenant_id', $tenantId);
+        else {
+            $user = Auth::user() ?? Auth::guard('sanctum')->user();
+            if ($user && isset($user->tenant_id) && $user->tenant_id) $base->where('tenant_id', $user->tenant_id);
+            else {
+                // Try from current request bearer token
+                $req = request();
+                $tid = $this->currentTenantId($req);
+                if ($tid) $base->where('tenant_id', $tid);
+            }
+        }
         return [
-            'total' => Antrian::whereDate('tanggal', $today)->count(),
-            'waiting' => Antrian::whereDate('tanggal', $today)->where('status', 'waiting')->count(),
-            'called' => Antrian::whereDate('tanggal', $today)->where('status', 'called')->count(),
-            'serving' => Antrian::whereDate('tanggal', $today)->where('status', 'serving')->count(),
-            'completed' => Antrian::whereDate('tanggal', $today)->where('status', 'completed')->count(),
-            'skipped' => Antrian::whereDate('tanggal', $today)->where('status', 'skipped')->count(),
+            'total' => (clone $base)->whereDate('tanggal', $today)->count(),
+            'waiting' => (clone $base)->whereDate('tanggal', $today)->where('status', 'waiting')->count(),
+            'called' => (clone $base)->whereDate('tanggal', $today)->where('status', 'called')->count(),
+            'serving' => (clone $base)->whereDate('tanggal', $today)->where('status', 'serving')->count(),
+            'completed' => (clone $base)->whereDate('tanggal', $today)->where('status', 'completed')->count(),
+            'skipped' => (clone $base)->whereDate('tanggal', $today)->where('status', 'skipped')->count(),
         ];
+    }
+
+    private function currentTenantId(Request $request): ?int
+    {
+        $user = $request->user('sanctum') ?? Auth::user();
+        if ($user && isset($user->tenant_id) && $user->tenant_id) return (int) $user->tenant_id;
+        return null;
+    }
+
+    private function resolveTenantIdForRequest(Request $request, ?string $serviceCode = null): ?int
+    {
+        $tid = $this->currentTenantId($request);
+        if ($tid) return $tid;
+        if ($serviceCode) {
+            $svc = Service::withoutGlobalScope('tenant')->where('code', $serviceCode)->where('is_active', 1)->first();
+            if ($svc && $svc->tenant_id) return (int) $svc->tenant_id;
+        }
+        return null;
     }
 
     private function broadcast(string $type, $payload): void
@@ -41,12 +71,14 @@ class QueueController extends Controller
     private function broadcastAll(Antrian $ticket, string $event): void
     {
         $this->broadcastTicket($event, $ticket);
-        $this->broadcast('stats_update', $this->getStats());
+        $tid = $ticket->tenant_id ?? $this->currentTenantId(request());
+        $this->broadcast('stats_update', $this->getStats($tid));
     }
 
     public function index(Request $request)
     {
-        $query = Antrian::query();
+        $tenantId = $this->currentTenantId($request);
+        $query = $tenantId ? Antrian::withoutGlobalScope('tenant')->where('tenant_id', $tenantId) : Antrian::query();
 
         // Rentang tanggal opsional — dipakai halaman Laporan.
         // Tanpa parameter from/to, default tetap hari ini.
@@ -90,18 +122,27 @@ class QueueController extends Controller
 
     public function takeTicket(Request $request)
     {
-        $request->validate([
-            'serviceType' => 'required|string|exists:services,code,is_active,1',
-        ]);
-
+        // For multi-tenant: if authenticated (kiosk), scope service lookup to its tenant; else fallback to first matching service code.
         $serviceType = $request->input('serviceType');
-        $today = Carbon::today();
-        $prefix = (string) (Service::where('code', $serviceType)->value('prefix') ?? 'A');
+        $tenantId = $this->resolveTenantIdForRequest($request, $serviceType);
 
-        $last = Antrian::whereDate('tanggal', $today)
-            ->where('service_type', $serviceType)
-            ->orderBy('id', 'desc')
-            ->first();
+        // Validate existence within resolved tenant if possible, otherwise global.
+        $request->validate([
+            'serviceType' => 'required|string',
+        ]);
+        $serviceQuery = Service::withoutGlobalScope('tenant')->where('code', $serviceType)->where('is_active', 1);
+        if ($tenantId) $serviceQuery->where('tenant_id', $tenantId);
+        if (!$serviceQuery->exists()) {
+            return response()->json(['success' => false, 'message' => 'Layanan tidak ditemukan'], 422);
+        }
+
+        $today = Carbon::today();
+        $prefix = (string) (Service::withoutGlobalScope('tenant')->where('code', $serviceType)->when($tenantId, fn($q)=>$q->where('tenant_id',$tenantId))->value('prefix') ?? 'A');
+
+        // Tenant-scoped sequence
+        $lastQuery = Antrian::withoutGlobalScope('tenant')->whereDate('tanggal', $today)->where('service_type', $serviceType);
+        if ($tenantId) $lastQuery->where('tenant_id', $tenantId);
+        $last = $lastQuery->orderBy('id', 'desc')->first();
 
         if ($last) {
             $parts = explode('-', $last->nomor_antrian);
@@ -118,6 +159,7 @@ class QueueController extends Controller
             'service_type' => $serviceType,
             'tanggal' => $today,
             'status' => 'waiting',
+            'tenant_id' => $tenantId,
         ]);
 
         $this->broadcastAll($antrian, 'queue_update');
@@ -292,11 +334,12 @@ class QueueController extends Controller
         ]);
     }
 
-    public function stats()
+    public function stats(Request $request)
     {
+        $tid = $this->currentTenantId($request);
         return response()->json([
             'success' => true,
-            'data' => $this->getStats(),
+            'data' => $this->getStats($tid),
         ]);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use App\Models\Service;
 use App\Services\WebSocketService;
@@ -18,8 +19,26 @@ class ServiceController extends Controller
         }
     }
 
-    public function index()
+    private function currentTenantId(Request $request): ?int
     {
+        // After trait fix, $request->user('sanctum') works without recursion for public routes with Bearer token
+        $user = $request->user('sanctum') ?? Auth::user();
+        if ($user && isset($user->tenant_id) && $user->tenant_id) return (int) $user->tenant_id;
+        return null;
+    }
+
+    public function index(Request $request)
+    {
+        $tenantId = $this->currentTenantId($request);
+        if ($tenantId) {
+            $query = Service::withoutGlobalScope('tenant')->where('tenant_id', $tenantId)->orderBy('id');
+            return response()->json(['success' => true, 'data' => $query->get()]);
+        }
+        if ($request->has('tenant_slug')) {
+            $tid = \App\Models\Tenant::where('slug', $request->input('tenant_slug'))->value('id');
+            if ($tid) return response()->json(['success' => true, 'data' => Service::withoutGlobalScope('tenant')->where('tenant_id', $tid)->orderBy('id')->get()]);
+        }
+        // Fallback: tenant-scoped via global scope when authenticated, else all
         return response()->json([
             'success' => true,
             'data' => Service::orderBy('id')->get(),
@@ -33,10 +52,11 @@ class ServiceController extends Controller
             'prefix' => strtoupper(trim((string) $request->input('prefix'))),
         ]);
 
+        $tenantId = Auth::user()->tenant_id ?? null;
         $request->validate([
             'name' => 'required|string|max:100',
-            'code' => 'required|string|max:50|alpha_dash|unique:services,code',
-            'prefix' => 'required|string|max:5|unique:services,prefix',
+            'code' => ['required','string','max:50','alpha_dash', Rule::unique('services','code')->where(fn($q)=>$q->where('tenant_id',$tenantId))],
+            'prefix' => ['required','string','max:5', Rule::unique('services','prefix')->where(fn($q)=>$q->where('tenant_id',$tenantId))],
             'counterNumber' => 'nullable|integer|min:1|max:99',
             'icon' => 'nullable|string|max:50',
             'serviceGroup' => 'nullable|in:group_a,group_b',
@@ -88,6 +108,7 @@ class ServiceController extends Controller
             $request->merge(['prefix' => strtoupper(trim((string) $request->input('prefix')))]);
         }
 
+        $tenantId = $service->tenant_id ?? Auth::user()->tenant_id ?? null;
         $request->validate([
             'name' => 'sometimes|required|string|max:100',
             'code' => [
@@ -96,14 +117,14 @@ class ServiceController extends Controller
                 'string',
                 'max:50',
                 'alpha_dash',
-                Rule::unique('services', 'code')->ignore($service->id),
+                Rule::unique('services', 'code')->where(fn($q)=>$q->where('tenant_id',$tenantId))->ignore($service->id),
             ],
             'prefix' => [
                 'sometimes',
                 'required',
                 'string',
                 'max:5',
-                Rule::unique('services', 'prefix')->ignore($service->id),
+                Rule::unique('services', 'prefix')->where(fn($q)=>$q->where('tenant_id',$tenantId))->ignore($service->id),
             ],
             'counterNumber' => 'nullable|integer|min:1|max:99',
             'icon' => 'nullable|string|max:50',
