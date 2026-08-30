@@ -11,7 +11,7 @@ class SettingsController extends Controller
 {
     private function tenantId(): ?int
     {
-        $user = Auth::user();
+        $user = request()->user('sanctum') ?? Auth::user() ?? Auth::guard('sanctum')->user();
         return $user && isset($user->tenant_id) ? (int) $user->tenant_id : null;
     }
 
@@ -79,16 +79,24 @@ class SettingsController extends Controller
         ]);
     }
 
+    private function monitorDir(): string
+    {
+        $tid = $this->tenantId();
+        return $tid ? 'monitor/' . $tid : 'monitor';
+    }
+
     public function getVideos()
     {
-        Storage::disk('public')->makeDirectory('monitor');
+        $dir = $this->monitorDir();
+        Storage::disk('public')->makeDirectory($dir);
 
-        $files = Storage::disk('public')->files('monitor');
+        $files = Storage::disk('public')->files($dir);
 
         $videos = array_map(function ($file) {
             $basename = basename($file);
+            // $file already includes dir prefix e.g. monitor/2/filename.mp4
             return [
-                'url' => url('storage/monitor/' . $basename),
+                'url' => url('storage/' . $file),
                 'filename' => $basename,
             ];
         }, $files);
@@ -115,20 +123,22 @@ class SettingsController extends Controller
         ]);
 
         try {
-            Storage::disk('public')->makeDirectory('monitor');
+            $dir = $this->monitorDir();
+            Storage::disk('public')->makeDirectory($dir);
 
             $file = $request->file('video');
             $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
             $ext = $file->getClientOriginalExtension();
             $filename = time() . '_' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $originalName) . '.' . $ext;
 
-            $file->storeAs('monitor', $filename, 'public');
+            $file->storeAs($dir, $filename, 'public');
 
+            $storedPath = $dir . '/' . $filename;
             return response()->json([
                 'success' => true,
                 'message' => 'Video berhasil diupload',
                 'data' => [
-                    'url' => url('storage/monitor/' . $filename),
+                    'url' => url('storage/' . $storedPath),
                     'filename' => $filename,
                 ]
             ]);
@@ -144,7 +154,8 @@ class SettingsController extends Controller
 
     public function deleteVideo($filename)
     {
-        $path = 'public/monitor/' . basename($filename);
+        $dir = $this->monitorDir();
+        $path = 'public/' . $dir . '/' . basename($filename);
 
         if (Storage::exists($path)) {
             Storage::delete($path);

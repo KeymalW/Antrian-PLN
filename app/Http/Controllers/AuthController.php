@@ -152,24 +152,26 @@ class AuthController extends Controller
 
     private function seedTenantSettings(int $tenantId): void
     {
-        $defaultTenantId = \App\Models\Tenant::where('slug', 'qserve-default')->value('id');
-        $files = ['general.json', 'ticket-text.json', 'kiosk-text.json'];
-        foreach ($files as $file) {
-            $src = storage_path('app/settings/' . $file);
-            $dstDir = storage_path('app/settings/tenants/' . $tenantId);
-            $dst = $dstDir . '/' . $file;
-            if (file_exists($dst)) continue;
-            if (!is_dir($dstDir)) mkdir($dstDir, 0755, true);
-            if ($defaultTenantId) {
-                $srcTenant = storage_path('app/settings/tenants/' . $defaultTenantId . '/' . $file);
-                if (file_exists($srcTenant)) {
-                    copy($srcTenant, $dst);
-                    continue;
-                }
-            }
-            if (file_exists($src)) {
-                copy($src, $dst);
-            }
-        }
+        $dstDir = storage_path('app/settings/tenants/' . $tenantId);
+        if (!is_dir($dstDir)) mkdir($dstDir, 0755, true);
+
+        // Identitas, Kiosk, Media TV dibuat kosong untuk tenant baru (belum input)
+        // General: kosong (admin harus isi nama instansi & logo)
+        file_put_contents($dstDir . '/general.json', json_encode([
+            'institution_name' => '',
+            'logo_url' => '',
+        ]));
+        // Kiosk: kosong
+        file_put_contents($dstDir . '/kiosk-text.json', json_encode([
+            'welcome_text' => '',
+            'subtitle_text' => '',
+            'hint_text' => '',
+            'footer_text' => '',
+        ]));
+        // Ticket: biarkan default generic (tidak kosong, agar cetak tetap bisa)
+        // Video: kosong (tidak ada video/link/volume custom)
+        file_put_contents($dstDir . '/video-links.json', json_encode([]));
+        file_put_contents($dstDir . '/video-volume.json', json_encode(['volume' => 0.2]));
+        // Ticket text biarkan fallback ke global default (tidak perlu file tenant khusus)
     }
 }
