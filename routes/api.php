@@ -10,6 +10,8 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\ServiceController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
+Route::get('/auth/admin-exists', [AuthController::class, 'adminExists']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
