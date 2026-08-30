@@ -112,11 +112,11 @@ class AuthController extends Controller
                 'tenant_id' => $tenant->id,
             ]);
 
-            // Seed default 3 services for this tenant (qserve-default already has them via backfill, new tenants need them)
+            // Seed default 3 services for this tenant — generik Layanan 1/2/3 (Opsi A untuk PKL)
             $defaults = [
-                ['name' => 'Pengaduan', 'code' => 'pengaduan', 'prefix' => 'G', 'counter_number' => 1, 'icon' => 'megaphone'],
-                ['name' => 'PB/PD/Migrasi', 'code' => 'pb_pd_migrasi', 'prefix' => 'M', 'counter_number' => 2, 'icon' => 'plug-zap'],
-                ['name' => 'P2TL', 'code' => 'p2tl', 'prefix' => 'T', 'counter_number' => 3, 'icon' => 'wrench'],
+                ['name' => 'Layanan 1', 'code' => 'layanan1', 'prefix' => 'A', 'counter_number' => 1, 'icon' => 'layers'],
+                ['name' => 'Layanan 2', 'code' => 'layanan2', 'prefix' => 'B', 'counter_number' => 2, 'icon' => 'layers'],
+                ['name' => 'Layanan 3', 'code' => 'layanan3', 'prefix' => 'C', 'counter_number' => 3, 'icon' => 'layers'],
             ];
             foreach ($defaults as $svc) {
                 \App\Models\Service::create([
