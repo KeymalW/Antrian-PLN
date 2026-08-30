@@ -155,20 +155,21 @@ class AuthController extends Controller
         $dstDir = storage_path('app/settings/tenants/' . $tenantId);
         if (!is_dir($dstDir)) mkdir($dstDir, 0755, true);
 
-        // Identitas, Kiosk, Media TV dibuat kosong untuk tenant baru (belum input)
-        // General: kosong (admin harus isi nama instansi & logo)
+        // Ambil nama perusahaan dari tenant untuk auto-isi identitas (Opsi A)
+        $tenantName = \App\Models\Tenant::where('id', $tenantId)->value('name') ?? '';
+
+        // Identitas: auto-isi dengan nama perusahaan (admin tetap bisa ubah di Pengaturan → Identitas)
         file_put_contents($dstDir . '/general.json', json_encode([
-            'institution_name' => '',
+            'institution_name' => $tenantName,
             'logo_url' => '',
         ]));
-        // Kiosk: kosong
+        // Kiosk: kosong (biar admin isi sendiri, sesuai permintaan)
         file_put_contents($dstDir . '/kiosk-text.json', json_encode([
             'welcome_text' => '',
             'subtitle_text' => '',
             'hint_text' => '',
             'footer_text' => '',
         ]));
-        // Ticket: biarkan default generic (tidak kosong, agar cetak tetap bisa)
         // Video: kosong (tidak ada video/link/volume custom)
         file_put_contents($dstDir . '/video-links.json', json_encode([]));
         file_put_contents($dstDir . '/video-volume.json', json_encode(['volume' => 0.2]));

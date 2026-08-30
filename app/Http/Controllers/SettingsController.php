@@ -92,6 +92,14 @@ class SettingsController extends Controller
 
         $files = Storage::disk('public')->files($dir);
 
+        // Fallback for qserve-default: if per-tenant dir empty, also check legacy global monitor/
+        if (empty($files) && $this->tenantId() === $this->defaultTenantId() && $dir !== 'monitor') {
+            $globalFiles = Storage::disk('public')->files('monitor');
+            // Only keep files directly in monitor/ (not in subdirs) and valid extensions
+            $globalFiles = array_filter($globalFiles, fn($f) => substr_count($f, '/') === 1);
+            if (!empty($globalFiles)) $files = $globalFiles;
+        }
+
         $videos = array_map(function ($file) {
             $basename = basename($file);
             // $file already includes dir prefix e.g. monitor/2/filename.mp4
@@ -114,6 +122,15 @@ class SettingsController extends Controller
             'success' => true,
             'data' => $videos
         ]);
+    }
+
+    private function defaultTenantId(): ?int
+    {
+        try {
+            return \App\Models\Tenant::where('slug', 'qserve-default')->value('id');
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     public function uploadVideo(Request $request)
