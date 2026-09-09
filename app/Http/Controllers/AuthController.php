@@ -82,10 +82,11 @@ class AuthController extends Controller
             'password' => 'required|string|min:6|confirmed',
         ]);
 
-        if (Tenant::count() >= 5) {
+        $max = (int) config('app.max_tenants', 5);
+        if ($max > 0 && Tenant::count() >= $max) {
             return response()->json([
                 'success' => false,
-                'message' => 'Batas perusahaan tercapai (maks 5 untuk demo PKL).',
+                'message' => "Batas perusahaan tercapai (maks $max). Hubungi admin QServe.com.",
             ], 403);
         }
 

@@ -123,6 +123,8 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
+    'max_tenants' => env('MAX_TENANTS', 5),
+
     /*
     |--------------------------------------------------------------------------
     | Autoloaded Service Providers

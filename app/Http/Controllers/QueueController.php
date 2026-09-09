@@ -54,10 +54,10 @@ class QueueController extends Controller
         return null;
     }
 
-    private function broadcast(string $type, $payload): void
+    private function broadcast(string $type, $payload, ?int $tenantId = null): void
     {
         try {
-            app(WebSocketService::class)->broadcast($type, $payload);
+            app(WebSocketService::class)->broadcast($type, $payload, $tenantId);
         } catch (\Throwable) {
             // silent
         }
@@ -65,14 +65,18 @@ class QueueController extends Controller
 
     private function broadcastTicket(string $event, Antrian $ticket): void
     {
-        $this->broadcast($event, $ticket->fresh()->toArray());
+        $data = $ticket->fresh()->toArray();
+        $this->broadcast($event, $data, $ticket->tenant_id ? (int)$ticket->tenant_id : null);
     }
 
     private function broadcastAll(Antrian $ticket, string $event): void
     {
         $this->broadcastTicket($event, $ticket);
-        $tid = $ticket->tenant_id ?? $this->currentTenantId(request());
-        $this->broadcast('stats_update', $this->getStats($tid));
+        $tid = $ticket->tenant_id ? (int)$ticket->tenant_id : $this->currentTenantId(request());
+        $stats = $this->getStats($tid);
+        // Ensure stats payload carries tenantId for server filtering
+        if ($tid) $stats['tenantId'] = $tid;
+        $this->broadcast('stats_update', $stats, $tid);
     }
 
     public function index(Request $request)

@@ -42,6 +42,7 @@ class Antrian extends Model
             'calledAt' => $this->called_at ? $this->called_at->toIso8601String() : null,
             'servingAt' => $this->serving_at ? $this->serving_at->toIso8601String() : null,
             'completedAt' => $this->completed_at ? $this->completed_at->toIso8601String() : null,
+            'tenantId' => $this->tenant_id !== null ? (int) $this->tenant_id : null,
         ];
     }
 }

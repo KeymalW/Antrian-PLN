@@ -8,6 +8,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\TenantController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:20,1');
@@ -58,6 +59,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/settings/video-links/{id}', [SettingsController::class, 'deleteVideoLink']);
     });
 });
+
+// Debug PKL — daftar tenant (tanpa auth, hanya id/slug/name)
+Route::get('/tenants', [TenantController::class, 'index']);
 
 // Publik (tanpa auth)
 Route::get('/settings/video-volume', [SettingsController::class, 'getVideoVolume']);

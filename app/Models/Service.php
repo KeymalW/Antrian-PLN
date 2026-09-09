@@ -39,6 +39,7 @@ class Service extends Model
             'serviceGroup' => $this->service_group ?? 'group_a',
             'isActive' => (bool) $this->is_active,
             'showInKiosk' => (bool) $this->show_in_kiosk,
+            'tenantId' => $this->tenant_id !== null ? (int) $this->tenant_id : null,
         ];
     }
 }
