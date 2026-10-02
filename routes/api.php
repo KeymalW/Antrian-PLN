@@ -55,6 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/settings/logo', [SettingsController::class, 'uploadLogo']);
         Route::post('/settings/ticket-text', [SettingsController::class, 'updateTicketText']);
         Route::post('/settings/kiosk-text', [SettingsController::class, 'updateKioskText']);
+        Route::put('/settings/theme', [SettingsController::class, 'updateTheme']);
         Route::post('/settings/video-links', [SettingsController::class, 'addVideoLink']);
         Route::delete('/settings/video-links/{id}', [SettingsController::class, 'deleteVideoLink']);
     });
@@ -70,6 +71,7 @@ Route::get('/settings/video-links', [SettingsController::class, 'getVideoLinks']
 Route::get('/settings/general', [SettingsController::class, 'getGeneral']);
 Route::get('/settings/ticket-text', [SettingsController::class, 'getTicketText']);
 Route::get('/settings/kiosk-text', [SettingsController::class, 'getKioskText']);
+Route::get('/settings/theme', [SettingsController::class, 'getTheme']);
 Route::get('/services', [ServiceController::class, 'index']);
 
 Route::get('/queue', [QueueController::class, 'index']);

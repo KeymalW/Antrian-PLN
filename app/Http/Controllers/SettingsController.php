@@ -428,6 +428,66 @@ class SettingsController extends Controller
     }
 
     /* ================================================================
+     |  Tema Warna (satu tema untuk TV, Kiosk, Admin, Petugas, Login)
+     * ================================================================ */
+
+    private function getThemeData(): array
+    {
+        $data = $this->readJson('theme.json', [
+            'preset_id' => 'pln-blue',
+            'primary' => '#1d4ed8',
+            'accent' => '#22d3ee',
+        ]);
+
+        return [
+            'presetId' => $data['preset_id'] ?? 'pln-blue',
+            'primary' => $data['primary'] ?? '#1d4ed8',
+            'accent' => $data['accent'] ?? '#22d3ee',
+        ];
+    }
+
+    public function getTheme()
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->getThemeData(),
+        ]);
+    }
+
+    public function updateTheme(Request $request)
+    {
+        $request->validate([
+            'presetId' => 'nullable|string|max:50',
+            'primary' => 'nullable|string|regex:/^#[0-9a-fA-F]{6}$/',
+            'accent' => 'nullable|string|regex:/^#[0-9a-fA-F]{6}$/',
+        ]);
+
+        $current = $this->readJson('theme.json', [
+            'preset_id' => 'pln-blue',
+            'primary' => '#1d4ed8',
+            'accent' => '#22d3ee',
+        ]);
+
+        if ($request->has('presetId')) {
+            $current['preset_id'] = trim((string) $request->input('presetId'));
+        }
+        if ($request->has('primary')) {
+            $current['primary'] = trim((string) $request->input('primary'));
+        }
+        if ($request->has('accent')) {
+            $current['accent'] = trim((string) $request->input('accent'));
+        }
+
+        $this->writeJson('theme.json', $current);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tema warna berhasil disimpan',
+            'data' => $this->getThemeData(),
+        ]);
+    }
+
+    /* ================================================================
      |  Video TV Display via Link (URL)
      * ================================================================ */
 
