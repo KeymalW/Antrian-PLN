@@ -1,6 +1,12 @@
 import { createServer } from 'node:http'
 import { WebSocket, WebSocketServer } from 'ws'
 
+// Railway injects PORT and exposes exactly one port per service.
+// - If PORT is set (Railway): WS upgrades + POST /broadcast share that
+//   single port, so the service works behind Railway's proxy.
+// - If PORT is unset (local dev): keep the legacy two-port behaviour so
+//   existing Laragon config (WS 3001 / relay 3002) keeps working.
+const RAILWAY_PORT = parseInt(process.env.PORT || '', 10) || null
 const WS_PORT = parseInt(process.env.WS_PORT || '3001', 10)
 const HTTP_PORT = parseInt(process.env.HTTP_PORT || '3002', 10)
 const BROADCAST_SECRET = process.env.BROADCAST_SECRET || ''
@@ -17,15 +23,12 @@ function broadcast(message, tenantId = null) {
   }
 }
 
-const wss = new WebSocketServer({ port: WS_PORT })
-
-wss.on('connection', (ws, req) => {
+function handleConnection(ws, req) {
   // Try to get tenantId from token query param via BE lookup is done client-side via register message; also try URL token for initial
   ws.tenantId = null
   // Parse ?token= or ?tenantId= from URL for early assignment (best-effort)
   try {
     const url = new URL(req.url, `http://${req.headers.host}`)
-    const token = url.searchParams.get('token')
     // We don't verify token here; client will send register with tenantId shortly
     if (url.searchParams.get('tenantId')) ws.tenantId = parseInt(url.searchParams.get('tenantId'), 10) || null
     if (url.searchParams.get('tenant_id')) ws.tenantId = parseInt(url.searchParams.get('tenant_id'), 10) || ws.tenantId
@@ -61,9 +64,9 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => {
     clients.delete(ws)
   })
-})
+}
 
-const httpServer = createServer((req, res) => {
+function requestHandler(req, res) {
   if (req.method === 'POST' && req.url === '/broadcast') {
     const secret = req.headers['x-broadcast-secret']
     if (secret !== BROADCAST_SECRET) {
@@ -87,13 +90,30 @@ const httpServer = createServer((req, res) => {
         res.end(JSON.stringify({ success: false, message: 'invalid JSON' }))
       }
     })
+  } else if (req.method === 'GET' && (req.url === '/health' || req.url === '/')) {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ ok: true, clients: clients.size }))
   } else {
     res.writeHead(404)
     res.end()
   }
-})
+}
 
-httpServer.listen(HTTP_PORT, () => {
+if (RAILWAY_PORT) {
+  // Single-port mode (Railway): one HTTP server handles WS upgrades,
+  // POST /broadcast relay, and GET /health on $PORT.
+  const httpServer = createServer(requestHandler)
+  new WebSocketServer({ server: httpServer }).on('connection', handleConnection)
+  httpServer.listen(RAILWAY_PORT, () => {
+    console.log(`WS + relay → http://0.0.0.0:${RAILWAY_PORT} (single-port mode)`)
+  })
+} else {
+  // Legacy two-port mode (local dev): unchanged behaviour.
+  new WebSocketServer({ port: WS_PORT }).on('connection', handleConnection)
   console.log(`WS server  → ws://0.0.0.0:${WS_PORT}`)
-  console.log(`HTTP relay → http://0.0.0.0:${HTTP_PORT}/broadcast`)
-})
+
+  const httpServer = createServer(requestHandler)
+  httpServer.listen(HTTP_PORT, () => {
+    console.log(`HTTP relay → http://0.0.0.0:${HTTP_PORT}/broadcast`)
+  })
+}
